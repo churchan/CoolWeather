@@ -1,7 +1,11 @@
 package com.coolweather.android;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.GravityCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Build;
@@ -9,6 +13,7 @@ import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -18,6 +23,7 @@ import android.widget.Toast;
 import com.bumptech.glide.Glide;
 import com.coolweather.android.gson.Forecast;
 import com.coolweather.android.gson.Weather;
+import com.coolweather.android.service.AutoUpdateService;
 import com.coolweather.android.util.HttpUtil;
 import com.coolweather.android.util.Utility;
 
@@ -31,7 +37,13 @@ import okhttp3.Response;
 
 public class WeatherActivity extends AppCompatActivity {
 
+    public DrawerLayout drawerLayout;
 
+    private Button navButton;
+
+    public SwipeRefreshLayout swipeRefreshLayout;
+
+    private String weatherId;
 
     private ScrollView weatherLayout;
 
@@ -84,6 +96,14 @@ public class WeatherActivity extends AppCompatActivity {
         setContentView(R.layout.activity_weather);
 
 //初始化各组件
+        drawerLayout = findViewById(R.id.drawer_layout);
+
+        navButton = findViewById(R.id.nav_button);
+
+        swipeRefreshLayout = findViewById(R.id.swipe_refresh);
+
+        swipeRefreshLayout.setColorSchemeResources(R.color.colorPrimary); // 设置下拉刷新进度条的颜色
+
         bingPicImg = findViewById(R.id.bing_pic_img);
 
         weatherLayout = findViewById(R.id.weather_layout);
@@ -112,25 +132,6 @@ public class WeatherActivity extends AppCompatActivity {
 
         String weatherString = prefs.getString("weather",null);
 
-
-
-
-        String bingPic = prefs.getString("bing_pic",null); // 尝试从缓存中读取
-
-        if(bingPic != null){
-
-            Glide.with(this).load(bingPic).into(bingPicImg);
-
-        }else{
-
-            loadBingPic(); // 没有读取到则加载
-
-        }
-
-
-
-
-
         if(weatherString != null){
 
 //有缓存时直接解析天气数据
@@ -150,6 +151,52 @@ public class WeatherActivity extends AppCompatActivity {
             requestWeather(weatherId);
 
         }
+
+
+        swipeRefreshLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
+
+            @Override
+
+            public void onRefresh() { // 设置下拉刷新监听器
+
+                requestWeather(weatherId);
+
+            }
+
+        });
+
+
+
+        String bingPic = prefs.getString("bing_pic",null); // 尝试从缓存中读取
+
+        if(bingPic != null){
+
+            Glide.with(this).load(bingPic).into(bingPicImg);
+
+        }else{
+
+            loadBingPic(); // 没有读取到则加载
+
+        }
+
+
+
+
+        navButton.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+
+            public void onClick(View v) {
+
+                drawerLayout.openDrawer(GravityCompat.START); // 打开滑动菜单
+
+            }
+
+        });
+
+
+
+
 
     }
 
@@ -258,6 +305,10 @@ public class WeatherActivity extends AppCompatActivity {
 
                         }
 
+
+                        swipeRefreshLayout.setRefreshing(false); // 表示刷新事件结束并隐藏刷新进度条
+
+
                     }
 
                 });
@@ -278,6 +329,7 @@ public class WeatherActivity extends AppCompatActivity {
 
                         Toast.makeText(WeatherActivity.this, "获取天气信息失败", Toast.LENGTH_SHORT).show();
 
+                        swipeRefreshLayout.setRefreshing(false);
                     }
 
                 });
@@ -319,6 +371,13 @@ public class WeatherActivity extends AppCompatActivity {
         weatherInfoText.setText(weatherInfo);
 
         forecastLayout.removeAllViews();
+
+
+
+        Intent intent = new Intent(this, AutoUpdateService.class);
+
+        startService(intent);
+
 
         for(Forecast forecast:weather.forecastList){ // 循环处理每天的天气信息
 
